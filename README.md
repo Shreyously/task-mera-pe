@@ -13,3 +13,9 @@ Setup
 Endpoints
 GET /api/limit/:userId
 POST /api/withdraw with Idempotency-Key header
+
+Task 3: Orphaned Payout Architecture Proposal
+
+To handle a missed Razorpay webhook, payouts are modeled as a state machine in our database: CREATED → SUBMITTED_TO_RAZORPAY → PENDING_CONFIRMATION → SUCCESS / FAILED. When we call RazorpayX, we immediately save the payout_id and reference_id Razorpay returns, and mark the withdrawal as PENDING_CONFIRMATION. If our server crashes and misses the webhook, a scheduled recovery worker runs every 2-5 minutes, finds any payouts stuck in PENDING_CONFIRMATION beyond a safe threshold, and polls Razorpay's payout status API directly to get the real outcome. This means webhook delivery improves speed, but is never the single source of truth.
+
+For reconciliation, a periodic job (hourly or daily) pulls Razorpay's payout report and does a line-by-line comparison against our internal ledger using payout_id, reference_id, and amount. Any mismatch — Razorpay shows success but our ledger doesn't, an amount difference, or a duplicate — gets written into a reconciliation queue. Safe mismatches are corrected automatically; anything risky is flagged for manual finance review. This guarantees our internal ledger always converges to Razorpay's reality, even when webhooks are delayed or missed entirely.
