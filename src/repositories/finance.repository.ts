@@ -1,4 +1,5 @@
 import { PoolClient } from "pg";
+import { toDateOnlyString } from "../utils/date";
 
 export type FinanceSnapshot = {
   userId: number;
@@ -21,7 +22,7 @@ const map = (r: Record<string, unknown>): FinanceSnapshot => ({
   daysWorked: Number(r.days_worked),
   totalWithdrawn: Number(r.total_withdrawn),
   withdrawalCount: Number(r.withdrawal_count),
-  monthStartDate: String(r.month_start_date)
+  monthStartDate: toDateOnlyString(r.month_start_date)
 });
 
 export async function getFinanceSnapshot(c: PoolClient, userId: number): Promise<FinanceSnapshot | null> {
@@ -40,7 +41,7 @@ export async function incrementLedger(
 ): Promise<{ totalWithdrawn: number; withdrawalCount: number }> {
   const r = await c.query(
     "UPDATE user_month_ledger SET total_withdrawn=total_withdrawn+$3,withdrawal_count=withdrawal_count+1,version=version+1,updated_at=NOW() WHERE user_id=$1 AND month_start_date=$2 RETURNING total_withdrawn,withdrawal_count",
-    [i.userId, i.monthStartDate, i.amount]
+    [i.userId, toDateOnlyString(i.monthStartDate), i.amount]
   );
 
   return {
